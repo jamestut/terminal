@@ -9,15 +9,7 @@ namespace Microsoft.Terminal.Wpf
     using System.Windows.Controls;
     using System.Windows.Input;
     using System.Windows.Media;
-        using System;
-    using System.Runtime.InteropServices;
-    using System.Windows;
-    using System.Windows.Automation;
-    using System.Windows.Automation.Peers;
-using System.Windows.Automation.Provider;
-    using System.Windows.Interop;
-    using System.Windows.Media;
-    using System.Windows.Threading;
+    
     /// <summary>
     /// A basic terminal control. This control can receive and render standard VT100 sequences.
     /// </summary>
@@ -37,7 +29,6 @@ using System.Windows.Automation.Provider;
             this.scrollbar.MouseWheel += this.Scrollbar_MouseWheel;
 
             this.GotFocus += this.TerminalControl_GotFocus;
-            this.termContainer.AutomationPeer = new Lazy<TerminalContainerAutomationPeer>(() => new TerminalContainerAutomationPeer(this));
         }
 
         /// <summary>
@@ -98,11 +89,6 @@ using System.Windows.Automation.Provider;
         {
             return this.termContainer.TriggerResize(rendersize);
         }
-
-        //protected override AutomationPeer OnCreateAutomationPeer()
-        //{
-        //    return this.termContainer.AutomationPeer.Value;
-        //}
 
         private void TerminalControl_GotFocus(object sender, RoutedEventArgs e)
         {

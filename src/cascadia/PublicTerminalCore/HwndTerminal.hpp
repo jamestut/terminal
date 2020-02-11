@@ -22,7 +22,7 @@ typedef struct _TerminalTheme
 } TerminalTheme, *LPTerminalTheme;
 
 extern "C" {
-__declspec(dllexport) HRESULT _stdcall CreateTerminal(HWND parentHwnd, IRawElementProviderSimple* _stdcall hostProviderCallback(), _Out_ void** hwnd, _Out_ void** terminal);
+__declspec(dllexport) HRESULT _stdcall CreateTerminal(HWND parentHwnd, _Out_ void** hwnd, _Out_ void** terminal);
 __declspec(dllexport) void _stdcall TerminalSendOutput(void* terminal, LPCWSTR data);
 __declspec(dllexport) void _stdcall TerminalRegisterScrollCallback(void* terminal, void __stdcall callback(int, int, int));
 __declspec(dllexport) HRESULT _stdcall TerminalTriggerResize(void* terminal, double width, double height, _Out_ COORD* dimensions);
@@ -46,7 +46,7 @@ __declspec(dllexport) void _stdcall TerminalSetCursorVisible(void* terminal, con
 struct HwndTerminal : IControlInfo
 {
 public:
-    HwndTerminal(HWND hwnd, IRawElementProviderSimple* _stdcall hostProviderCallback());
+    HwndTerminal(HWND hwnd);
     HRESULT Initialize();
     void SendOutput(std::wstring_view data);
     HRESULT Refresh(const SIZE windowSize, _Out_ COORD* dimensions);
@@ -67,9 +67,8 @@ private:
 
     std::unique_ptr<::Microsoft::Console::Render::Renderer> _renderer;
     std::unique_ptr<::Microsoft::Console::Render::DxEngine> _renderEngine;
-    std::function<IRawElementProviderSimple*()> hostProviderCallback;
 
-    friend HRESULT _stdcall CreateTerminal(HWND parentHwnd, IRawElementProviderSimple* _stdcall hostProviderCallback(), _Out_ void** hwnd, _Out_ void** terminal);
+    friend HRESULT _stdcall CreateTerminal(HWND parentHwnd, _Out_ void** hwnd, _Out_ void** terminal);
     friend HRESULT _stdcall TerminalResize(void* terminal, COORD dimensions);
     friend void _stdcall TerminalDpiChanged(void* terminal, int newDpi);
     friend void _stdcall TerminalUserScroll(void* terminal, int viewTop);

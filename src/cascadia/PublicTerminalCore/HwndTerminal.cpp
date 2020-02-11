@@ -27,12 +27,12 @@ LRESULT CALLBACK HwndTerminal::HwndTerminalWndProc(
 
     if (terminal)
     {
-        auto lock = terminal->_terminal->LockForWriting();
         switch (uMsg)
         {
         case WM_GETOBJECT:
             if (static_cast<long>(lParam) == static_cast<long>(UiaRootObjectId))
             {
+                auto lock = terminal->_terminal->LockForWriting();
                 return UiaReturnRawElementProvider(hwnd, wParam, lParam, terminal->_GetUiaProvider());
             }
         }
@@ -62,11 +62,10 @@ static bool RegisterTermClass(HINSTANCE hInstance) noexcept
     return RegisterClassW(&wc) != 0;
 }
 
-HwndTerminal::HwndTerminal(HWND parentHwnd, IRawElementProviderSimple* _stdcall hostProviderCallback()) :
+HwndTerminal::HwndTerminal(HWND parentHwnd) :
     _desiredFont{ DEFAULT_FONT_FACE, 0, 10, { 0, 14 }, CP_UTF8 },
     _actualFont{ DEFAULT_FONT_FACE, 0, 10, { 0, 14 }, CP_UTF8, false },
-    _uiaProvider{ nullptr },
-    hostProviderCallback{ hostProviderCallback }
+    _uiaProvider{ nullptr }
 {
     HINSTANCE hInstance = wil::GetModuleInstanceHandle();
 
@@ -82,8 +81,8 @@ HwndTerminal::HwndTerminal(HWND parentHwnd, IRawElementProviderSimple* _stdcall 
                 WS_VISIBLE,
             0,
             0,
-            1000,
-            1000,
+            0,
+            0,
             parentHwnd,
             nullptr,
             hInstance,
@@ -204,7 +203,7 @@ HRESULT HwndTerminal::Refresh(const SIZE windowSize, _Out_ COORD* dimensions)
     RETURN_HR_IF_NULL(E_INVALIDARG, dimensions);
 
     auto lock = _terminal->LockForWriting();
-
+    
     RETURN_IF_FAILED(_renderEngine->SetWindowSize(windowSize));
 
     // Invalidate everything
@@ -233,12 +232,29 @@ void HwndTerminal::SendOutput(std::wstring_view data)
     _terminal->Write(data);
 }
 
-HRESULT _stdcall CreateTerminal(HWND parentHwnd, IRawElementProviderSimple* _stdcall hostProviderCallback(), _Out_ void** hwnd, _Out_ void** terminal)
+HRESULT _stdcall CreateTerminal(HWND parentHwnd, _Out_ void** hwnd, _Out_ void** terminal)
 {
-    auto _terminal = std::make_unique<HwndTerminal>(parentHwnd, hostProviderCallback);
+    auto _hostWindow = CreateWindowEx(
+        0,
+        L"static",
+        nullptr,
+                    WS_CHILD |
+                WS_CLIPCHILDREN |
+                WS_CLIPSIBLINGS |
+                WS_VISIBLE,
+        0,
+        0,
+        0,
+        0,
+        parentHwnd,
+        (HMENU)0x02,
+        nullptr,
+        0
+    );
+    auto _terminal = std::make_unique<HwndTerminal>(_hostWindow);
     RETURN_IF_FAILED(_terminal->Initialize());
 
-    *hwnd = _terminal->_hwnd.get();
+    *hwnd = _hostWindow;
     *terminal = _terminal.release();
 
     return S_OK;
@@ -265,6 +281,16 @@ void _stdcall TerminalSendOutput(void* terminal, LPCWSTR data)
 HRESULT _stdcall TerminalTriggerResize(void* terminal, double width, double height, _Out_ COORD* dimensions)
 {
     const auto publicTerminal = static_cast<HwndTerminal*>(terminal);
+    
+    SetWindowPos(
+        publicTerminal->GetHwnd(),
+        nullptr,
+        0,
+        0,
+        static_cast<int>(width),
+        static_cast<int>(height),
+        0
+    );
 
     const SIZE windowSize{ static_cast<short>(width), static_cast<short>(height) };
     return publicTerminal->Refresh(windowSize, dimensions);

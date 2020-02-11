@@ -3,19 +3,11 @@
 // Licensed under the MIT license.
 // </copyright>
 
-using System;
-using System.Runtime.InteropServices;
-using System.Windows;
-using System.Windows.Automation.Peers;
-using System.Windows.Automation.Provider;
-using System.Windows.Interop;
-
 namespace Microsoft.Terminal.Wpf
 {
     using System;
     using System.Runtime.InteropServices;
     using System.Windows;
-    using System.Windows.Automation;
     using System.Windows.Interop;
     using System.Windows.Media;
     using System.Windows.Threading;
@@ -34,18 +26,16 @@ namespace Microsoft.Terminal.Wpf
         private DispatcherTimer blinkTimer;
         private NativeMethods.ScrollCallback scrollCallback;
         private NativeMethods.WriteCallback writeCallback;
-        private NativeMethods.UiaProviderCallback uiaCallback;
         
         /// <summary>
         /// Initializes a new instance of the <see cref="TerminalContainer"/> class.
         /// </summary>
         public TerminalContainer()
         {
-            //this.MessageHook += this.TerminalContainer_MessageHook;
-            //this.GotFocus += this.TerminalContainer_GotFocus;
-            //this.Focusable = true;
-            this.Columns = 80;
-                        this.Rows = 25;
+            this.MessageHook += this.TerminalContainer_MessageHook;
+            this.GotFocus += this.TerminalContainer_GotFocus;
+            this.Focusable = true;
+            
             var blinkTime = NativeMethods.GetCaretBlinkTime();
 
             if (blinkTime != uint.MaxValue)
@@ -83,8 +73,6 @@ namespace Microsoft.Terminal.Wpf
         internal int Columns { get; private set; }
 
         internal IntPtr Hwnd => this.hwnd;
-
-        internal Lazy<TerminalContainerAutomationPeer> AutomationPeer { get; set; }
 
         /// <summary>
         /// Sets the connection to the terminal backend.
@@ -173,31 +161,6 @@ namespace Microsoft.Terminal.Wpf
             this.connection?.Resize((uint)dimensions.Y, (uint)dimensions.X);
         }
 
-        protected override IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
-        {
-            switch ((NativeMethods.WindowMessage)msg)
-            {
-                case NativeMethods.WindowMessage.WM_GETOBJECT:
-                    handled = true;
-                    TerminalContainerAutomationPeer peer = UIElementAutomationPeer.CreatePeerForElement(this) as TerminalContainerAutomationPeer;
-                    IntPtr result = IntPtr.Zero;
-                    if(peer != null)
-                    {
-                        // get the element proxy
-                        IRawElementProviderSimple el = peer.GetProvider();
-        
-                        if (el != null)
-                        {
-                            //This requires FullTrust but we already have it.
-                            result = AutomationInteropProvider.ReturnRawElementProvider(Handle, wParam, lParam, el);
-                        }
-                    }
-                    return result;
-            }
-
-            return base.WndProc(hwnd, msg, wParam, lParam, ref handled);
-        }
-
         /// <inheritdoc/>
         protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
         {
@@ -211,8 +174,7 @@ namespace Microsoft.Terminal.Wpf
         protected override HandleRef BuildWindowCore(HandleRef hwndParent)
         {
             var dpiScale = VisualTreeHelper.GetDpi(this);
-            this.uiaCallback = this.OnGetProvider;
-            NativeMethods.CreateTerminal(hwndParent.Handle, this.uiaCallback, out this.hwnd, out this.terminal);
+            NativeMethods.CreateTerminal(hwndParent.Handle, out this.hwnd, out this.terminal);
 
             this.scrollCallback = this.OnScroll;
             this.writeCallback = this.OnWrite;
@@ -243,11 +205,6 @@ namespace Microsoft.Terminal.Wpf
         {
             NativeMethods.DestroyTerminal(this.terminal);
             this.terminal = IntPtr.Zero;
-        }
-
-        protected override AutomationPeer OnCreateAutomationPeer()
-        {
-            return new TerminalContainerAutomationPeer(this);
         }
 
         private void TerminalContainer_GotFocus(object sender, RoutedEventArgs e)
@@ -368,11 +325,6 @@ namespace Microsoft.Terminal.Wpf
         private void OnWrite(string data)
         {
             this.connection?.WriteInput(data);
-        }
-
-        private IRawElementProviderSimple OnGetProvider()
-        {
-            return this.AutomationPeer.Value.GetProvider();
         }
     }
 }
